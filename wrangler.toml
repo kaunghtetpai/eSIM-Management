@@ -1,0 +1,15 @@
+name = "nexorasim-api"
+main = "api/worker.js"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "nexorasim-api"
+route = "api.nexorasim.com/*"
+
+[[env.production.kv_namespaces]]
+binding = "NEXORASIM_KV"
+id = "nexorasim_kv_namespace"
+
+[pages]
+project_name = "nexorasim-portal"
+compatibility_date = "2024-01-01"
