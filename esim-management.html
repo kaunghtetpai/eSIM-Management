@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>eSIM Enterprise Management</title>
+    <script src="https://alcdn.msauth.net/browser/2.14.2/js/msal-browser.min.js"></script>
+</head>
+<body>
+    <div id="loginSection">
+        <h2>eSIM Enterprise Authentication</h2>
+        <button onclick="login()">Login with Microsoft</button>
+        <div id="error" style="color:red;margin-top:10px;"></div>
+    </div>
+    <div id="appSection" style="display:none;">
+        <h2>eSIM Management Dashboard</h2>
+        <div id="userInfo"></div>
+        <button onclick="deployeSIM()">Deploy eSIM</button>
+        <button onclick="logout()">Logout</button>
+        <div id="result" style="margin-top:10px;"></div>
+    </div>
+
+    <script>
+        const msalConfig = {
+            auth: {
+                clientId: process.env.AZURE_CLIENT_ID || 'your-client-id', // Replace with your actual client ID
+                authority: 'https://login.microsoftonline.com/common',
+                redirectUri: window.location.origin
+            },
+            cache: {
+                cacheLocation: "sessionStorage"
+            }
+        };
+
+        const loginRequest = {
+            scopes: [
+                'https://graph.microsoft.com/DeviceManagementConfiguration.ReadWrite.All',
+                'https://graph.microsoft.com/Device.ReadWrite.All',
+                'https://graph.microsoft.com/Group.ReadWrite.All',
+                'https://graph.microsoft.com/User.Read.All'
+            ]
+        };
+
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        async function login() {
+            try {
+                document.getElementById('error').textContent = '';
+                const response = await msalInstance.loginPopup(loginRequest);
+                
+                document.getElementById('loginSection').style.display = 'none';
+                document.getElementById('appSection').style.display = 'block';
+                document.getElementById('userInfo').innerHTML = `Logged in as: ${response.account.name}`;
+                
+            } catch (error) {
+                document.getElementById('error').textContent = `Login failed: ${error.message}`;
+                console.error('Login failed:', error);
+            }
+        }
+
+        async function deployeSIM() {
+            try {
+                const account = msalInstance.getAllAccounts()[0];
+                const response = await msalInstance.acquireTokenSilent({
+                    ...loginRequest,
+                    account: account
+                });
+                
+                // Direct Graph API call
+                const graphResponse = await fetch('https://graph.microsoft.com/v1.0/groups', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${response.accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        displayName: `eSIM-Devices-${new Date().toISOString().split('T')[0]}`,
+                        groupTypes: ["DynamicMembership"],
+                        membershipRule: '(device.deviceOSType -eq "Windows")',
+                        membershipRuleProcessingState: "On",
+                        securityEnabled: true,
+                        mailEnabled: false
+                    })
+                });
+
+                if (graphResponse.ok) {
+                    const group = await graphResponse.json();
+                    document.getElementById('result').innerHTML = 
+                        `<div style="color:green;">Group created: ${group.displayName}</div>`;
+                } else {
+                    const error = await graphResponse.json();
+                    document.getElementById('result').innerHTML = 
+                        `<div style="color:red;">Error: ${error.error.message}</div>`;
+                }
+                
+            } catch (error) {
+                document.getElementById('result').innerHTML = 
+                    `<div style="color:red;">Deployment failed: ${error.message}</div>`;
+                console.error('Deployment failed:', error);
+            }
+        }
+
+        function logout() {
+            msalInstance.logoutPopup();
+        }
+
+        // Initialize
+        msalInstance.initialize();
+    </script>
+</body>
+</html>

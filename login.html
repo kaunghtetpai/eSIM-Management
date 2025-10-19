@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Azure AD Login</title>
+    <script src="https://alcdn.msauth.net/browser/2.38.3/js/msal-browser.min.js"></script>
+</head>
+<body>
+    <div id="loginContainer">
+        <h2>Login with Azure AD</h2>
+        <button id="loginBtn">Sign In</button>
+    </div>
+    
+    <div id="userInfo" style="display:none;">
+        <h3>Welcome!</h3>
+        <p id="userName"></p>
+        <button id="logoutBtn">Sign Out</button>
+    </div>
+
+    <script>
+        const msalConfig = {
+            auth: {
+                clientId: "YOUR_CLIENT_ID", // Replace with your app registration client ID
+                authority: "https://login.microsoftonline.com/igsim.onmicrosoft.com",
+                redirectUri: window.location.origin
+            }
+        };
+
+        const msalInstance = new msal.PublicClientApplication(msalConfig);
+
+        const loginRequest = {
+            scopes: ["User.Read"]
+        };
+
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            try {
+                const response = await msalInstance.loginPopup(loginRequest);
+                showUserInfo(response.account);
+            } catch (error) {
+                console.error('Login failed:', error);
+            }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', () => {
+            msalInstance.logout();
+        });
+
+        function showUserInfo(account) {
+            document.getElementById('loginContainer').style.display = 'none';
+            document.getElementById('userInfo').style.display = 'block';
+            document.getElementById('userName').textContent = account.name || account.username;
+        }
+
+        // Check if user is already logged in
+        msalInstance.handleRedirectPromise().then((response) => {
+            if (response) {
+                showUserInfo(response.account);
+            }
+        });
+    </script>
+</body>
+</html>
